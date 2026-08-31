@@ -1,5 +1,0 @@
-method,roc_auc,average_precision,precision_at_50
-"baseline rule (week 4, refit on train)",0.562,0.604,0.72
-logistic regression,0.62,0.653,0.7
-decision tree (depth=4),0.582,0.609,0.58
-random forest,0.623,0.656,0.8
