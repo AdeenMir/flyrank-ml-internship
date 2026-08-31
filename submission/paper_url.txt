@@ -1,1 +1,1 @@
-PASTE-YOUR-DEPLOYED-PAPER-URL-HERE
+https://adeenmir.github.io/flyrank-ml-internship/
