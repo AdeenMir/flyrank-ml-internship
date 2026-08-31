@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CTR / Engagement Opportunity Scoring — FlyRank ML Capstone</title>
+<style>
+body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65;color:#17202a;background:#f6f7f9;margin:0}
+main{max-width:980px;margin:0 auto;padding:56px 24px 80px}
+article{background:#fff;border:1px solid #e2e5e9;border-radius:18px;padding:42px 48px;box-shadow:0 8px 28px rgba(0,0,0,.05)}
+h1{font-size:40px;line-height:1.1;margin:.2em 0 .35em}
+h2{margin-top:2.2em;border-bottom:1px solid #e8eaed;padding-bottom:.35em}
+.lede{font-size:19px;color:#4b5563}
+.callout{background:#f1f5f9;border-left:4px solid #334155;padding:16px 18px;margin:24px 0}
+table{border-collapse:collapse;width:100%;margin:18px 0}
+th,td{padding:11px 12px;border-bottom:1px solid #e5e7eb;text-align:left}
+th{background:#f8fafc}
+strong{color:#111827}
+.small{font-size:14px;color:#667085}
+img{max-width:100%}
+a{color:#155eef}
+code{background:#f1f3f5;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<main><article>
+<p class="small">FlyRank ML Internship · CTR / Engagement Opportunity Scoring</p>
+<h1>Can a learned ranker improve the content-review queue?</h1>
+<p class="lede">A leakage-aware comparison of a transparent CTR baseline, logistic regression, a small decision tree, and a random forest on a client-grouped holdout.</p>
+
+<div class="callout"><strong>Headline result:</strong> the random forest was the strongest tested ranker on the committed grouped test run: ROC AUC <strong>0.623</strong>, average precision <strong>0.656</strong>, and precision@50 <strong>0.760</strong>, versus 0.562 / 0.604 / 0.720 for the Week-4 baseline. The test-set base rate was 0.559.</div>
+
+<h2>0. Abstract</h2>
+<p>This study asks whether a learned ranking model can prioritize content pages that are observed as declining better than a transparent CTR baseline. The analysis uses the public-safe anonymized FlyRank internship dataset, with <code>trend_direction == "down"</code> as an independent proxy label and a client-grouped 70/30 holdout to prevent client overlap between training and test. Three models were compared with the Week-4 position-tier CTR baseline: logistic regression, a depth-4 decision tree, and a random forest. On the committed test run, the random forest had the strongest discrimination (ROC AUC 0.623, average precision 0.656, precision@50 0.760) versus 0.562, 0.604, and 0.720 for the refit baseline. The output is best used as a human-review queue, not as an automated SEO decision or a causal prediction of search-engine behavior.</p>
+
+<h2>1. Problem framing</h2>
+<p>The decision is which content pages an editor should review first for possible engagement/CTR improvement. The unit is a content page and the output is a ranked review score. A human reviews the page and search context before acting. False positives consume reviewer time; false negatives can leave a possible opportunity unreviewed.</p>
+<p>ML is useful here because the page-level data contains multiple exposure, position, content-age, and engagement signals whose combined ranking value can be tested against a simple rule.</p>
+
+<h2>2. Data safety</h2>
+<p>The analysis uses the repository's anonymized content-refresh dataset, a trailing-90-day page snapshot. The target columns <code>trend_direction</code> and <code>trend_pct</code> are excluded from features. The 30-day current/previous impressions, clicks, and sessions windows are also excluded because they directly feed the observed trend and could reconstruct the label. <code>client_id</code> is used only for grouped validation and <code>content_id</code> is an identifier, not a feature.</p>
+<p>No client-identifying details are used in this paper.</p>
+
+<h2>3. Baseline</h2>
+<p>The Week-4 baseline compares CTR with the median CTR expected for the page's position tier, requires at least 500 impressions over 90 days, and combines the positive CTR gap with an exposure rank. For this comparison, tier medians are fitted on training rows only before the test set is scored.</p>
+<table><tr><th>Metric</th><th>Baseline</th></tr>
+<tr><td>ROC AUC</td><td>0.562</td></tr>
+<tr><td>Average precision</td><td>0.604</td></tr>
+<tr><td>Precision@50</td><td>0.720</td></tr></table>
+
+<h2>4. Model / analysis</h2>
+<p>The target is <code>is_declining_label = (trend_direction == "down")</code>. Features include search demand, competition, content size, 90-day exposure and traffic totals, activity days, content age, freshness, CTR, average position, engagement/scroll rates, AI-traffic share, missingness indicators, and categorical tiers.</p>
+<p>Logistic regression provides a readable linear reference; a depth-4 decision tree tests a small human-readable rule; and a 300-tree random forest tests whether a stronger nonlinear ranker earns its complexity. All use random seed 42.</p>
+
+<h2>5. Evaluation</h2>
+<p>The split is a 70/30 <code>GroupShuffleSplit</code> by client, seed 42. The committed run has 19,166 training rows and 10,834 test rows, with 22 clients in train and 10 in test and zero client overlap.</p>
+<table><tr><th>Method</th><th>ROC AUC</th><th>Average precision</th><th>Precision@50</th></tr>
+<tr><td>Week-4 baseline</td><td>0.562</td><td>0.604</td><td>0.720</td></tr>
+<tr><td>Logistic regression</td><td>0.620</td><td>0.653</td><td>0.700</td></tr>
+<tr><td>Decision tree (depth 4)</td><td>0.582</td><td>0.609</td><td>0.680</td></tr>
+<tr><td><strong>Random forest</strong></td><td><strong>0.623</strong></td><td><strong>0.656</strong></td><td><strong>0.760</strong></td></tr></table>
+<p><img src="assets/auc.svg" alt="ROC AUC comparison"></p>
+<p>The clearest false negatives were pages with only 1–2 impressions in 90 days. This is a sparse-data failure rather than evidence that the feature set is useless. The most confident false positives included pages with very low CTR despite reasonable position and moderate exposure, illustrating that weak CTR and observed decline are related but not identical outcomes.</p>
+
+<h2>6. Interpretation</h2>
+<p>The random forest's leading features were <code>avg_position</code> (0.1096), <code>log_impressions_90d</code> (0.1057), <code>days_with_impressions</code> (0.0928), <code>content_age_days</code> (0.0757), and <code>log_sessions_90d</code> (0.0521), followed by content-size, activity, CTR, and scroll signals. No single feature dominates; the top two importances are close.</p>
+<p>The depth-4 tree is a useful negative result. It had 16 leaves and only 14 unique predicted probabilities across the test rows, creating many ties and weakening top-50 ranking. Its simplicity did not earn enough performance to replace the baseline.</p>
+
+<h2>7. Recommendation</h2>
+<ol>
+<li><strong>Use the random-forest score as a review queue.</strong> It is the strongest tested ranker on the same grouped holdout.</li>
+<li><strong>Keep the 500-impression volume floor.</strong> Near-zero exposure produces the clearest model failures, so abstention is preferable to false precision.</li>
+<li><strong>Prioritize high-score pages with meaningful exposure.</strong> Position, impressions, activity days, content age, and sessions are strong prioritization signals.</li>
+<li><strong>Require a human reason code.</strong> A score should explain why a page entered the queue, not prescribe an automatic rewrite.</li>
+</ol>
+<p><strong>Confidence:</strong> moderate for ranking within this dataset and split; low for causal or future-time claims.</p>
+
+<h2>8. Reproducibility</h2>
+<p>The analysis is implemented in <code>work/notebooks/capstone.ipynb</code>. It uses grouped 70/30 validation with seed 42 and writes model-comparison and feature-importance CSVs plus an AUC chart to <code>work/outputs/</code>.</p>
+<pre>pip install -r requirements.txt
+jupyter nbconvert --to notebook --execute work/notebooks/capstone.ipynb --output /tmp/capstone.executed.ipynb</pre>
+<p>The executed notebook is the authoritative re-run because it rebuilds the data, split, baseline, models, and metrics.</p>
+
+<h2>9. Acknowledgments &amp; data credit</h2>
+<p>Built on the FlyRank ML Internship dataset. <a href="https://flyrank.ai">FlyRank</a>.</p>
+
+<p class="small">Public-safe research artifact · Claims are observational and directional; no causal or Google-algorithm claims are made.</p>
+</article></main>
+</body>
+</html>
